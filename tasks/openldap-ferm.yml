@@ -1,0 +1,8 @@
+---
+- name: deploy ferm config
+  template:
+    src=ferm.conf
+    dest=/etc/ferm/ferm.d/30-ldap.conf
+    owner=root
+    group=root
+  notify: run ferm

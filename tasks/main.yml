@@ -1,0 +1,93 @@
+---
+- name: install openldap (debian)
+  apt: name={{ item }} state=latest
+  when: "ansible_pkg_mgr == 'apt'"
+  with_items:
+  - slapd
+  - ldap-utils
+  - python3
+  tags:
+  - ldap
+  notify:
+  - restart ldap
+
+- name: install openldap (redhat)
+  dnf: name={{ item }} state=latest
+  when: "ansible_pkg_mgr == 'dnf'"
+  with_items:
+  - openldap-servers
+  - openldap-clients
+  - python3-pip
+  - python3
+  tags:
+  - ldap
+  notify:
+  - restart ldap
+
+- name: start ldap
+  service: name=slapd state=started enabled=yes
+  tags:
+  - ldap
+
+- name: configure ldap server
+  script: configure-ldap.py server
+      --schema-dir '{{ "/etc/openldap/schema/" if ansible_os_family == "RedHat" else "/etc/ldap/schema/" }}'
+  register: configure
+  changed_when: 'configure.rc == 10'
+  failed_when: 'configure.rc not in [0, 10]'
+  tags:
+  - ldap
+
+- include: openldap-ferm.yml
+  when: "ferm | default(False)"
+  tags:
+  - ferm
+  - ldap
+
+- name: prepare database directories
+  with_items: openldap_master_domains + openldap_slave_domains
+  file: state=directory
+        path="/var/lib/ldap/{{ item.fqdn }}"
+        owner={{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}
+        group={{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}
+        mode=u=rwx,go-rwx
+  tags:
+  - ldap
+
+- name: configure ldap domains
+  script: configure-ldap.py master-domain
+      --database-dir '/var/lib/ldap/{{ item.fqdn }}/'
+      --replicator-dn-password '{{ item.replicator_dn_password | default("") }}'
+      'dc={{ item.fqdn | replace(".", ",dc=") }}'
+      {{ item.fqdn }}
+      {{ item.admin_dn_password }}
+  register: configure
+  changed_when: 'configure.rc == 10'
+  failed_when: 'configure.rc not in [0, 10]'
+  with_items: openldap_master_domains
+  tags:
+  - ldap
+
+- name: configure ldap domains
+  script: configure-ldap.py slave-domain
+      --database-dir '/var/lib/ldap/{{ item.fqdn }}/'
+      'dc={{ item.fqdn | replace(".", ",dc=") }}'
+      {{ item.fqdn }}
+      {{ item.replicator_dn_password }}
+      {{ item.master }}
+  register: configure
+  changed_when: 'configure.rc == 10'
+  failed_when: 'configure.rc not in [0, 10]'
+  with_items: openldap_slave_domains
+  tags:
+  - ldap
+
+- name: deploy scripts
+  template:
+    src=ldapum.py
+    dest=/usr/local/bin/ldapum
+    owner=root
+    group=root
+    mode=ug=rwx,o-rwx
+  tags:
+  - ldap
