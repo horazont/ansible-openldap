@@ -342,18 +342,7 @@ def ensure_group(ldap, domain, groupname, gidnumber):
     )
 
 
-def configure_ldap_domain(args, ldap):
-    try:
-        database_dn = util_find_database_dn(args.domain)
-    except LookupError:
-        logging.warning("no such database, trying to create database")
-        ldap.make_database(database_dir=args.database_dir,
-                           suffix=args.domain,
-                           root_dn=ROOT_DN)
-        database_dn = util_find_database_dn(args.domain)
-
-    ldap.ensure_attr_has_value(
-        database_dn, "olcSuffix", args.domain)
+def configure_ldap_domain_common(args, ldap, database_dn):
     # 1 GiB ought to be enough
     ldap.ensure_attr_has_value(
         database_dn, "olcDbMaxSize", str(2**30))
@@ -393,6 +382,22 @@ def configure_ldap_domain(args, ldap):
             "cn eq",
         ]
     )
+
+
+def configure_ldap_domain(args, ldap):
+    try:
+        database_dn = util_find_database_dn(args.domain)
+    except LookupError:
+        logging.warning("no such database, trying to create database")
+        ldap.make_database(database_dir=args.database_dir,
+                           suffix=args.domain,
+                           root_dn=ROOT_DN)
+        database_dn = util_find_database_dn(args.domain)
+
+    ldap.ensure_attr_has_value(
+        database_dn, "olcSuffix", args.domain)
+
+    configure_ldap_domain_common(args, ldap, database_dn)
 
     ldap.ensure_object(
         args.domain, ["dcObject", "top", "organization"],
@@ -453,6 +458,23 @@ def configure_ldap_server(args, ldap):
     ldap.ensure_schema("nis", schema_dir=args.schema_dir)
     ldap.ensure_schema("inetorgperson", schema_dir=args.schema_dir)
     ldap.ensure_schema("misc", schema_dir=args.schema_dir)
+
+    if args.debug:
+        ldap.ensure_attr_values(
+            "cn=config",
+            "olcLogLevel",
+            [
+                "-1",
+            ]
+        )
+    else:
+        ldap.ensure_attr_values(
+            "cn=config",
+            "olcLogLevel",
+            [
+                "none",
+            ]
+        )
 
 
 def configure_ldap_syncrepl_slave(args, ldap):
@@ -552,11 +574,8 @@ def configure_ldap_slave_domain(args, ldap):
 
     ldap.ensure_attr_has_value(
         database_dn, "olcSuffix", args.domain)
-    # 1 GiB ought to be enough
-    ldap.ensure_attr_has_value(
-        database_dn, "olcDbMaxSize", str(2**30))
-    ldap.ensure_attr_has_value(
-        database_dn, "olcRootDN", ROOT_DN)
+
+    configure_ldap_domain_common(args, ldap, database_dn)
 
     ldap.ensure_attr_has_value(
         database_dn,
@@ -606,6 +625,16 @@ if __name__ == "__main__":
     parser = subparsers.add_parser("server")
     parser.set_defaults(func=configure_ldap_server)
     parser.add_argument("--schema-dir", default="/etc/openldap/schema/")
+    parser.add_argument(
+        "--debug",
+        default=False,
+        action="store_true"
+    )
+    parser.add_argument(
+        "--no-debug",
+        action="store_false",
+        dest="debug"
+    )
 
     parser = subparsers.add_parser("syncrepl-slave")
     parser.set_defaults(func=configure_ldap_syncrepl_slave)

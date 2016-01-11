@@ -3,3 +3,4 @@ openldap_firewall_open: False
 openldap_firewall_saddr_whitelist: []
 openldap_master_domains: []
 openldap_slave_domains: []
+openldap_install_scripts: False

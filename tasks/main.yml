@@ -32,6 +32,7 @@
 - name: configure ldap server
   script: configure-ldap.py server
       --schema-dir '{{ "/etc/openldap/schema/" if ansible_os_family == "RedHat" else "/etc/ldap/schema/" }}'
+      '{{ "--debug" if openldap_debug else "--no-debug" }}'
   register: configure
   changed_when: 'configure.rc == 10'
   failed_when: 'configure.rc not in [0, 10]'
@@ -89,5 +90,7 @@
     owner=root
     group=root
     mode=ug=rwx,o-rwx
+  when: openldap_install_scripts
   tags:
   - ldap
+  - test
