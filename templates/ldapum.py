@@ -4,6 +4,7 @@ import getpass
 import hashlib
 import random
 import subprocess
+import types
 
 SALT_BYTES = 16
 
@@ -19,6 +20,12 @@ sn: {sn}
 givenName: {given_name}
 mail: {mail}
 userPassword:: {password_base64}\n"""
+
+GROUP_TEMPLATE = """\
+dn: cn={name},ou=Group,{base}
+objectClass: posixGroup
+gidNumber: {gid}
+\n"""
 
 PASSWD_TEMPLATE = """\
 dn: uid={uid},ou=Account,{base}
@@ -58,6 +65,27 @@ homeDirectory: {home}
 -
 add: loginShell
 loginShell: /bin/bash
+-\n"""
+
+ADD_TO_GROUP_TEMPLATE = """\
+dn: cn={group},ou=Group,{base}
+changetype: modify
+add: memberUid
+memberUid: {uid}
+-\n"""
+
+REMOVE_FROM_GROUP_TEMPLATE = """\
+dn: cn={group},ou=Group,{base}
+changetype: modify
+delete: memberUid
+memberUid: {uid}
+-\n"""
+
+UPGRADE_TEMPLATE = """\
+dn: uid={uid},ou=Account,{base}
+changetype: modify
+add: objectClass
+objectClass: inetLocalMailRecipient
 -\n"""
 
 
@@ -110,6 +138,31 @@ def useradd(args):
         base=args.base,
         password_base64=base64.b64encode(ssha_password(args.password)).decode(
             "ascii"))
+
+    if args.dry_run:
+        print(instance)
+        return
+
+    try:
+        print(subprocess.check_output(
+            [
+                "ldapadd",
+                "-Y", "EXTERNAL",
+                "-H", "ldapi://"
+            ],
+            input=instance.encode()
+        ).decode())
+    except subprocess.CalledProcessError:
+        print("failed")
+        sys.exit(1)
+
+
+def groupadd(args):
+    instance = GROUP_TEMPLATE.format(
+        gid=args.gid,
+        name=args.name,
+        base=args.base
+    )
 
     if args.dry_run:
         print(instance)
@@ -182,6 +235,30 @@ def mailaddress_add(args):
         sys.exit(1)
 
 
+def upgrade(args):
+    instance = UPGRADE_TEMPLATE.format(
+        uid=args.uid,
+        base=args.base,
+    )
+
+    if args.dry_run:
+        print(instance)
+        return
+
+    try:
+        print(subprocess.check_output(
+            [
+                "ldapmodify",
+                "-Y", "EXTERNAL",
+                "-H", "ldapi://"
+            ],
+            input=instance.encode()
+        ).decode())
+    except subprocess.CalledProcessError:
+        print("failed")
+        sys.exit(1)
+
+
 def mailaddress_remove(args):
     instance = "dn: uid={},ou=Account,{}\nchangetype: modify\n".format(args.uid, args.base)
     instance += "".join(
@@ -216,6 +293,38 @@ def enable_login(args):
         home=args.home or "/home/{}".format(args.uid)
     )
 
+    ns = types.SimpleNamespace()
+    ns.base = args.base
+    ns.uid = args.uid
+    ns.group = "ldapuser"
+    ns.dry_run = args.dry_run
+
+    if args.dry_run:
+        print(instance)
+        user_add_to_group(ns)
+        return
+
+    try:
+        print(subprocess.check_output(
+            [
+                "ldapmodify",
+                "-Y", "EXTERNAL",
+                "-H", "ldapi://"
+            ],
+            input=instance.encode()
+        ).decode())
+    except subprocess.CalledProcessError:
+        print("failed")
+        sys.exit(1)
+    user_add_to_group(ns)
+
+
+def userdel(args):
+    instance = USERDEL_TEMPLATE.format(
+        uid=args.uid,
+        base=args.base,
+    )
+
     if args.dry_run:
         print(instance)
         return
@@ -234,9 +343,35 @@ def enable_login(args):
         sys.exit(1)
 
 
-def userdel(args):
-    instance = USERDEL_TEMPLATE.format(
+def user_add_to_group(args):
+    instance = ADD_TO_GROUP_TEMPLATE.format(
         uid=args.uid,
+        group=args.group,
+        base=args.base,
+    )
+
+    if args.dry_run:
+        print(instance)
+        return
+
+    try:
+        print(subprocess.check_output(
+            [
+                "ldapmodify",
+                "-Y", "EXTERNAL",
+                "-H", "ldapi://"
+            ],
+            input=instance.encode()
+        ).decode())
+    except subprocess.CalledProcessError:
+        print("failed")
+        sys.exit(1)
+
+
+def user_remove_from_group(args):
+    instance = REMOVE_FROM_GROUP_TEMPLATE.format(
+        uid=args.uid,
+        group=args.group,
         base=args.base,
     )
 
@@ -323,6 +458,20 @@ if __name__ == "__main__":
         help="E-Mail address under which the user can be reached"
     )
 
+    sparser = subparsers.add_parser("groupadd")
+    sparser.set_defaults(func=groupadd)
+    sparser.add_argument(
+        "name",
+        metavar="USERNAME",
+        help="Alphanumeric group identifier. Must be unique, cannot be changed"
+    )
+    sparser.add_argument(
+        "gid",
+        metavar="NUMBER",
+        type=int,
+        help="Numeric group identifier. Must be unique, cannot be changed"
+    )
+
     sparser = subparsers.add_parser("passwd")
     sparser.set_defaults(func=passwd)
     sparser.add_argument(
@@ -350,6 +499,40 @@ if __name__ == "__main__":
         nargs="+",
         metavar="MAILADDRESS",
         help="Mail aliases to add, must be full mail addresses"
+    )
+
+    sparser = subparsers.add_parser("upgrade")
+    sparser.set_defaults(func=upgrade)
+    sparser.add_argument(
+        "uid",
+        metavar="USERNAME",
+        help="UID of the user to modify"
+    )
+
+    sparser = subparsers.add_parser("user-add-to-group")
+    sparser.set_defaults(func=user_add_to_group)
+    sparser.add_argument(
+        "uid",
+        metavar="USERNAME",
+        help="UID of the user to add to a group"
+    )
+    sparser.add_argument(
+        "group",
+        metavar="GROUP",
+        help="Name of the group"
+    )
+
+    sparser = subparsers.add_parser("user-remove-from-group")
+    sparser.set_defaults(func=user_remove_from_group)
+    sparser.add_argument(
+        "uid",
+        metavar="USERNAME",
+        help="UID of the user to remove from a group"
+    )
+    sparser.add_argument(
+        "group",
+        metavar="GROUP",
+        help="Name of the group"
     )
 
     sparser = subparsers.add_parser("mailaddress-remove")

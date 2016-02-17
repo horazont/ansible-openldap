@@ -12,6 +12,16 @@ LDAP_TEMPLATE = ["-Y", "EXTERNAL",
 ROOT_DN = "gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth"
 
 
+CERTCONFIG_TEMPLATE = """\
+dn: cn=config
+changetype: modify
+{mode}: olcTLSCertificateFile
+olcTLSCertificateFile: {cert}
+-
+{mode}: olcTLSCertificateKeyFile
+olcTLSCertificateKeyFile: {key}"""
+
+
 def dictify_ldif_content(ldif):
     d = {}
     prevkey = None
@@ -476,6 +486,25 @@ def configure_ldap_server(args, ldap):
             ]
         )
 
+    if args.tls:
+        try:
+            modify(CERTCONFIG_TEMPLATE.format(
+                key="/etc/ldap/privkey.pem",
+                cert="/etc/ldap/cert.pem",
+                mode="add").encode("ascii"))
+        except subprocess.CalledProcessError:
+            modify(CERTCONFIG_TEMPLATE.format(
+                key="/etc/ldap/privkey.pem",
+                cert="/etc/ldap/cert.pem",
+                mode="replace").encode("ascii"))
+
+        ldap.ensure_attr_has_value(
+            "cn=config",
+            "olcTLSCACertificateFile",
+            "/etc/ldap/cacert.pem",
+            replace=True
+        )
+
 
 def configure_ldap_syncrepl_slave(args, ldap):
     ldap.load_module("syncprov.la")
@@ -634,6 +663,17 @@ if __name__ == "__main__":
         "--no-debug",
         action="store_false",
         dest="debug"
+    )
+
+    parser.add_argument(
+        "--tls",
+        default=False,
+        action="store_true"
+    )
+    parser.add_argument(
+        "--no-tls",
+        action="store_false",
+        dest="tls"
     )
 
     parser = subparsers.add_parser("syncrepl-slave")

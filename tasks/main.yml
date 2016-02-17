@@ -29,10 +29,45 @@
   tags:
   - ldap
 
+- name: upload CA certificate
+  copy:
+    content: "{{openldap_cacert}}"
+    dest: /etc/{{ "openldap" if ansible_distribution == "Fedora" else "ldap" }}/cacert.pem
+    mode: u=r,go-rwx
+    owner: '{{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}'
+    group: '{{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}'
+  when: openldap_cert and openldap_privkey and openldap_cacert
+  tags:
+  - ldap
+
+- name: upload server certificate
+  copy:
+    content: "{{openldap_cert}}"
+    dest: /etc/{{ "openldap" if ansible_distribution == "Fedora" else "ldap" }}/cert.pem
+    mode: u=r,go-rwx
+    owner: '{{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}'
+    group: '{{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}'
+  when: openldap_cert and openldap_privkey and openldap_cacert
+  tags:
+  - ldap
+
+- name: upload server key
+  copy:
+    content: "{{openldap_privkey}}"
+    dest: /etc/{{ "openldap" if ansible_distribution == "Fedora" else "ldap" }}/privkey.pem
+    mode: u=r,go-rwx
+    owner: '{{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}'
+    group: '{{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}'
+  when: openldap_cert and openldap_privkey and openldap_cacert
+  tags:
+  - ldap
+  - requires-secrets
+
 - name: configure ldap server
   script: configure-ldap.py server
       --schema-dir '{{ "/etc/openldap/schema/" if ansible_os_family == "RedHat" else "/etc/ldap/schema/" }}'
       '{{ "--debug" if openldap_debug else "--no-debug" }}'
+      '{{ "--tls" if openldap_cacert and openldap_privkey and openldap_cert else "--no-tls" }}'
   register: configure
   changed_when: 'configure.rc == 10'
   failed_when: 'configure.rc not in [0, 10]'
@@ -83,6 +118,13 @@
   tags:
   - ldap
 
+- name: configure ldap client
+  template:
+    src: ldap.conf
+    dest: /etc/{{ "openldap" if ansible_distribution == "Fedora" else "ldap" }}/ldap.conf
+  tags:
+  - ldap
+
 - name: deploy scripts
   template:
     src=ldapum.py
@@ -93,3 +135,4 @@
   when: openldap_install_scripts
   tags:
   - ldap
+  - test
