@@ -284,6 +284,24 @@ def mailaddress_remove(args):
         sys.exit(1)
 
 
+def mailaddress_list(args):
+    try:
+        print(subprocess.check_output(
+            [
+                "ldapsearch",
+                "-Y", "EXTERNAL",
+                "-H", "ldapi://",
+                "-LLL",
+                "-b", "ou=Account,dc=zombofant,dc=net",
+                "uid={}".format(args.uid),
+                "mailLocalAddress",
+            ]
+        ).decode())
+    except subprocess.CalledProcessError:
+        print("failed")
+        sys.exit(1)
+
+
 def enable_login(args):
     instance = ENABLE_LOGIN_TEMPLATE.format(
         uid=args.uid,
@@ -547,6 +565,14 @@ if __name__ == "__main__":
         nargs="+",
         metavar="MAILADDRESS",
         help="Mail aliases to add, must be full mail addresses"
+    )
+
+    sparser = subparsers.add_parser("mailaddress-list")
+    sparser.set_defaults(func=mailaddress_list)
+    sparser.add_argument(
+        "uid",
+        metavar="USERNAME",
+        help="UID of the user whose addresses to list"
     )
 
     sparser = subparsers.add_parser("login-enable")
