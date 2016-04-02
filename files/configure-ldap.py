@@ -369,6 +369,9 @@ def configure_ldap_domain_common(args, ldap, database_dn):
  by self write\
  by anonymous auth\
  by * none".format(domain=args.domain),
+            "to attrs=mailLocalAddress,uidNumber,gidNumber,objectClass,homeDirectory\
+ by dn=cn=AuthManager,ou=Management,{domain} manage\
+ by * read".format(domain=args.domain),
             "to dn.subtree=ou=Account,{domain}\
  by dn=cn=AuthManager,ou=Management,{domain} write\
  by self write\
