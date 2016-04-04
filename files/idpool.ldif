@@ -1,0 +1,9 @@
+# AUTO-GENERATED FILE - DO NOT EDIT!! Use ldapmodify.
+# CRC32 02b7392f
+dn: cn=idpool,cn=schema,cn=config
+objectClass: olcSchemaConfig
+cn: idpool
+olcObjectClasses: {0}( 1.3.6.1.4.1.7165.1.2.2.3 NAME 'uidPool' DESC 'Pool fo
+ r allocating UNIX uids' SUP top AUXILIARY MUST ( uidNumber $ cn ) )
+olcObjectClasses: {1}( 1.3.6.1.4.1.7165.1.2.2.4 NAME 'gidPool' DESC 'Pool fo
+ r allocating UNIX gids' SUP top AUXILIARY MUST ( gidNumber $ cn ) )

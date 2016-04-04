@@ -344,11 +344,17 @@ changetype: modify
         self._flag_changed()
 
 
-def ensure_group(ldap, domain, groupname, gidnumber):
+def ensure_group(ldap, domain, groupname, gidnumber, description=None):
+    additional_attrs = []
+    if description:
+        additional_attrs.append(
+            ("description", description)
+        )
     ldap.ensure_object(
         "cn={},ou=Group,".format(groupname)+domain,
         ["posixGroup"],
-        ("gidNumber", str(gidnumber))
+        ("gidNumber", str(gidnumber)),
+        *additional_attrs
     )
 
 
@@ -375,6 +381,9 @@ def configure_ldap_domain_common(args, ldap, database_dn):
             "to dn.subtree=ou=Account,{domain}\
  by dn=cn=AuthManager,ou=Management,{domain} write\
  by self write\
+ by * read".format(domain=args.domain),
+            "to dn.subtree=ou=Group,{domain}\
+ by dn=cn=AuthManager,ou=Management,{domain} write\
  by * read".format(domain=args.domain),
             "to *\
  by self write\
@@ -438,6 +447,50 @@ def configure_ldap_domain(args, ldap):
     )
 
     ldap.ensure_object(
+        "ou=Permission,"+args.domain, "organizationalUnit",
+        ("ou", "Permission"),
+        ("description", "Permission lists")
+    )
+
+    ldap.ensure_object(
+        "cn=admin,ou=Permission,"+args.domain, "groupOfUniqueNames",
+        ("cn", "admin"),
+        ("uniqueMember", "cn=dummy")
+    )
+
+    ldap.ensure_object(
+        "ou=IDPool,"+args.domain,
+        [
+            "organizationalUnit",
+        ],
+        ("ou", "IDPool"),
+    )
+
+    ldap.ensure_object(
+        "ou=uids,ou=IDPool,"+args.domain,
+        [
+            "organizationalUnit",
+            "uidPool",
+        ],
+        ("ou", "uids"),
+        ("cn", "LDAP user UID Pool"),
+        ("uidNumber", "10000"),
+        strict=False
+    )
+
+    ldap.ensure_object(
+        "ou=gids,ou=IDPool,"+args.domain,
+        [
+            "organizationalUnit",
+            "gidPool",
+        ],
+        ("ou", "uids"),
+        ("cn", "LDAP user GID Pool"),
+        ("gidNumber", "10000"),
+        strict=False
+    )
+
+    ldap.ensure_object(
         "cn=AuthManager,ou=Management,"+args.domain, "person",
         ("sn", "Authentication Manager"),
         ("userpassword", args.admin_dn_password))
@@ -456,8 +509,15 @@ def configure_ldap_domain(args, ldap):
             ("sn", "Replication user"),
             ("userpassword", args.replicator_dn_password))
 
-    ensure_group(ldap, args.domain, "sftponly", 1099)
-    ensure_group(ldap, args.domain, "ldapuser", 1098)
+    ensure_group(
+        ldap, args.domain, "sftponly", 1099,
+        "Users in this group only gain SFTP instead of full shell access on "
+        "some hosts."
+    )
+    ensure_group(
+        ldap, args.domain, "ldapuser", 1098,
+        "Removing users from this group will give them more permissions "
+        "than intended.")
 
 
 def configure_ldap_server(args, ldap):
@@ -471,6 +531,8 @@ def configure_ldap_server(args, ldap):
     ldap.ensure_schema("nis", schema_dir=args.schema_dir)
     ldap.ensure_schema("inetorgperson", schema_dir=args.schema_dir)
     ldap.ensure_schema("misc", schema_dir=args.schema_dir)
+    ldap.ensure_schema("idpool", schema_dir=args.schema_dir)
+    ldap.ensure_schema("hijack1", schema_dir=args.schema_dir)
 
     if args.debug:
         ldap.ensure_attr_values(

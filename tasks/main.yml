@@ -24,6 +24,16 @@
   notify:
   - restart ldap
 
+- name: upload schema files
+  copy:
+    src: "{{ item }}"
+    dest: /etc/{{ "openldap" if ansible_distribution == "Fedora" else "ldap" }}/schema/
+  with_items:
+  - idpool.ldif
+  - hijack1.ldif
+  tags:
+  - ldap
+
 - name: start ldap
   service: name=slapd state=started enabled=yes
   tags:

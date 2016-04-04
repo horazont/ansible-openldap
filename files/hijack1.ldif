@@ -1,0 +1,5 @@
+dn: cn=hijack1,cn=schema,cn=config
+objectClass: olcSchemaConfig
+cn: hijack1
+olcAttributeTypes: {0}( 666.666.1.1.1 NAME 'xmppLocalAddress' DESC 'Jabber ID' EQUALITY caseIgnoreIA5Match SUBSTR caseIgnoreIA5SubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.26{1024} )
+olcObjectClasses: {0}( 666.666.1.2.1 NAME 'xmppLocalUser' DESC 'Local XMPP user' SUP top AUXILIARY MAY ( xmppLocalAddress ) )
