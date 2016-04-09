@@ -31,6 +31,8 @@
   with_items:
   - idpool.ldif
   - hijack1.ldif
+  - hijack2.ldif
+  - hijack3.ldif
   tags:
   - ldap
 

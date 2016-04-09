@@ -456,9 +456,9 @@ def configure_ldap_domain(args, ldap):
     )
 
     ldap.ensure_object(
-        "cn=admin,ou=Permission,"+args.domain, "groupOfUniqueNames",
+        "cn=admin,ou=Permission,"+args.domain, "groupOfNames",
         ("cn", "admin"),
-        ("uniqueMember", "cn=dummy")
+        ("member", "cn=dummy")
     )
 
     ldap.ensure_object(
@@ -543,6 +543,8 @@ def configure_ldap_server(args, ldap):
     ldap.ensure_schema("misc", schema_dir=args.schema_dir)
     ldap.ensure_schema("idpool", schema_dir=args.schema_dir)
     ldap.ensure_schema("hijack1", schema_dir=args.schema_dir)
+    ldap.ensure_schema("hijack2", schema_dir=args.schema_dir)
+    ldap.ensure_schema("hijack3", schema_dir=args.schema_dir)
 
     if args.debug:
         ldap.ensure_attr_values(
