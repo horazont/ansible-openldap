@@ -161,6 +161,7 @@ class LDAPInterface:
         args = ["-LLL"]
         args.extend(["-s", "base"])
         args.extend(["-b", dn])
+        args.extend(["*", "+"])
 
         result = dictify_ldif_content(ldapcall("ldapsearch", args))
         self._cache(tag, result)
@@ -370,6 +371,8 @@ def configure_ldap_domain_common(args, ldap, database_dn):
             "to *\
  by dn.base=cn=replicator,ou=Management,{domain} read\
  by * break".format(domain=args.domain),
+            "to attrs=authzTo\
+ by * read",
             "to attrs=userPassword\
  by dn=cn=AuthManager,ou=Management,{domain} manage\
  by self write\
@@ -495,6 +498,13 @@ def configure_ldap_domain(args, ldap):
         ("sn", "Authentication Manager"),
         ("userpassword", args.admin_dn_password))
 
+    ldap.ensure_object(
+        "cn=RemoteManager,ou=Management,"+args.domain, "person",
+        ("sn", "Remote Manager"),
+        ("userpassword", args.admin_dn_password),
+        ("authzTo", "dn:cn=AuthManager,ou=Management,"+args.domain),
+    )
+
     if args.replicator_dn_password:
         ldap.load_module("syncprov.la")
 
@@ -569,6 +579,14 @@ def configure_ldap_server(args, ldap):
             "/etc/ldap/cacert.pem",
             replace=True
         )
+
+    ldap.ensure_attr_values(
+        "cn=config",
+        "olcAuthzPolicy",
+        [
+            "to"
+        ]
+    )
 
 
 def configure_ldap_syncrepl_slave(args, ldap):
@@ -689,6 +707,28 @@ def configure_ldap_slave_domain(args, ldap):
         )
     )
 
+    ldap.ensure_attr_values(
+        database_dn,
+        "olcUpdateRef",
+        ["ldap://{}".format(args.master)],
+    )
+
+    ldap.ensure_object(
+        "olcOverlay={0}chain,olcDatabase={-1}frontend,cn=config",
+        ["olcOverlayConfig", "olcChainConfig"],
+        ("olcOverlay", "{0}chain"),
+        ("olcChainReturnError", "TRUE"),
+        strict=False,
+    )
+
+    ldap.ensure_object(
+        "olcDatabase={0}ldap,olcOverlay={0}chain,olcDatabase={-1}frontend,cn=config",
+        ["olcLDAPConfig", "olcChainDatabase"],
+        ("olcDBURI", "ldap://{}".format(args.master)),
+        ("olcDbIDAssertBind", """bindmethod=simple binddn="cn=RemoteManager,ou=Management,dc=zombofant,dc=net" credentials="{pwd}" mode=self""".format(pwd=args.admin_dn_password)),
+        ("olcDbRebindAsUser", "TRUE"),
+    )
+
 
 if __name__ == "__main__":
     import argparse
@@ -715,6 +755,7 @@ if __name__ == "__main__":
     parser.add_argument("fqdn")
     parser.add_argument("replicator_dn_password")
     parser.add_argument("master")
+    parser.add_argument("admin_dn_password")
 
     parser = subparsers.add_parser("server")
     parser.set_defaults(func=configure_ldap_server)

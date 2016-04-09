@@ -121,6 +121,7 @@
       {{ item.fqdn }}
       {{ item.replicator_dn_password }}
       {{ item.master }}
+      {{ item.admin_dn_password }}
   register: configure
   changed_when: 'configure.rc == 10'
   failed_when: 'configure.rc not in [0, 10]'
