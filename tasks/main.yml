@@ -82,7 +82,7 @@
       '{{ "--tls" if openldap_cacert and openldap_privkey and openldap_cert else "--no-tls" }}'
   register: configure
   changed_when: 'configure.rc == 10'
-  failed_when: 'configure.rc not in [0, 10]'
+  failed_when: 'configure.rc != 0 and configure.rc != 10'
   tags:
   - ldap
 
@@ -93,7 +93,7 @@
   - ldap
 
 - name: prepare database directories
-  with_items: openldap_master_domains + openldap_slave_domains
+  with_items: "{{ openldap_master_domains + openldap_slave_domains }}"
   file: state=directory
         path="/var/lib/ldap/{{ item.fqdn }}"
         owner={{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}
@@ -111,8 +111,8 @@
       {{ item.admin_dn_password }}
   register: configure
   changed_when: 'configure.rc == 10'
-  failed_when: 'configure.rc not in [0, 10]'
-  with_items: openldap_master_domains
+  failed_when: 'configure.rc != 0 and configure.rc != 10'
+  with_items: "{{ openldap_master_domains }}"
   tags:
   - ldap
 
@@ -126,8 +126,8 @@
       {{ item.admin_dn_password }}
   register: configure
   changed_when: 'configure.rc == 10'
-  failed_when: 'configure.rc not in [0, 10]'
-  with_items: openldap_slave_domains
+  failed_when: 'configure.rc != 0 and configure.rc != 10'
+  with_items: "{{ openldap_slave_domains }}"
   tags:
   - ldap
 
