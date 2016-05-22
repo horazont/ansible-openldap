@@ -408,6 +408,14 @@ def configure_ldap_domain_common(args, ldap, database_dn):
         ]
     )
 
+    ldap.load_module("memberof.la")
+
+    ldap.ensure_object(
+        "olcOverlay=memberof,"+database_dn,
+        ["olcMemberOf", "olcOverlayConfig"],
+        fuzzy_base=database_dn
+    )
+
 
 def configure_ldap_domain(args, ldap):
     try:
