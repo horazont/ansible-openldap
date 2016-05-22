@@ -458,7 +458,8 @@ def configure_ldap_domain(args, ldap):
     ldap.ensure_object(
         "cn=admin,ou=Permission,"+args.domain, "groupOfNames",
         ("cn", "admin"),
-        ("member", "cn=dummy")
+        ("member", "cn=dummy"),
+        strict=False,
     )
 
     ldap.ensure_object(
