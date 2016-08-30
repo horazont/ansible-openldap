@@ -378,8 +378,11 @@ def configure_ldap_domain_common(args, ldap, database_dn):
  by self write\
  by anonymous auth\
  by * none".format(domain=args.domain),
-            "to attrs=mailLocalAddress,uidNumber,gidNumber,objectClass,homeDirectory\
+            "to attrs=mailLocalAddress,uidNumber,gidNumber,objectClass,homeDirectory,disposableMailAddressOwner,disposableMailAddressEnabled,disposableMailAddressDiscard\
  by dn=cn=AuthManager,ou=Management,{domain} manage\
+ by * read".format(domain=args.domain),
+            "to dn.subtree=ou=DisposableMailBoxes,{domain}\
+ by dn=cn=AuthManager,ou=Management,{domain} write\
  by * read".format(domain=args.domain),
             "to dn.subtree=ou=Account,{domain}\
  by dn=cn=AuthManager,ou=Management,{domain} write\
@@ -405,6 +408,9 @@ def configure_ldap_domain_common(args, ldap, database_dn):
             "entryCSN eq",
             "entryUUID eq",
             "cn eq",
+            "disposableMailAddressOwner eq",
+            "disposableMailAddressEnabled eq",
+            "disposableMailAddressDiscard eq",
         ]
     )
 
@@ -503,6 +509,14 @@ def configure_ldap_domain(args, ldap):
     )
 
     ldap.ensure_object(
+        "ou=DisposableMailBoxes,"+args.domain,
+        [
+            "organizationalUnit",
+        ],
+        ("ou", "DisposableMailBoxes"),
+    )
+
+    ldap.ensure_object(
         "cn=AuthManager,ou=Management,"+args.domain, "person",
         ("sn", "Authentication Manager"),
         ("userpassword", args.admin_dn_password))
@@ -551,9 +565,12 @@ def configure_ldap_server(args, ldap):
     ldap.ensure_schema("inetorgperson", schema_dir=args.schema_dir)
     ldap.ensure_schema("misc", schema_dir=args.schema_dir)
     ldap.ensure_schema("idpool", schema_dir=args.schema_dir)
+
     ldap.ensure_schema("hijack1", schema_dir=args.schema_dir)
     ldap.ensure_schema("hijack2", schema_dir=args.schema_dir)
     ldap.ensure_schema("hijack3", schema_dir=args.schema_dir)
+    ldap.ensure_schema("hijack4", schema_dir=args.schema_dir)
+    ldap.ensure_schema("hijack5", schema_dir=args.schema_dir)
 
     if args.debug:
         ldap.ensure_attr_values(

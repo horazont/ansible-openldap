@@ -33,6 +33,8 @@
   - hijack1.ldif
   - hijack2.ldif
   - hijack3.ldif
+  - hijack4.ldif
+  - hijack5.ldif
   tags:
   - ldap
 

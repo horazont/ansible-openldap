@@ -1,0 +1,9 @@
+dn: cn=hijack4,cn=schema,cn=config
+objectClass: olcSchemaConfig
+cn: hijack4
+olcAttributeTypes: {0}( 666.666.4.1.1 NAME 'disposableMailAddressDiscard' DESC 'If enabled, all mails to the disposable address are silently discarded by the mail server' EQUALITY booleanMatch SYNTAX  1.3.6.1.4.1.1466.115.121.1.7 SINGLE-VALUE )
+olcAttributeTypes: {1}( 666.666.4.1.2 NAME 'disposableMailAddress' DESC 'The address' EQUALITY caseIgnoreIA5Match SUBSTR caseIgnoreIA5SubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.26{1024} SINGLE-VALUE )
+olcAttributeTypes: {2}( 666.666.4.1.3 NAME 'disposableMailWhitelistedSender' DESC 'Mails from this sender are delivered, even if discard is enabled (but not if the address is disabled)' EQUALITY caseIgnoreIA5Match SUBSTR caseIgnoreIA5SubstringsMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.26{1024} )
+olcAttributeTypes: {3}( 666.666.4.1.4 NAME 'disposableMailAddressEnabled' DESC 'If the address is disabled, the server will reject mail to this address as if it did not exist; this takes precedence over discard.' EQUALITY booleanMatch SYNTAX  1.3.6.1.4.1.1466.115.121.1.7 SINGLE-VALUE )
+olcAttributeTypes: {4}( 666.666.4.1.5 NAME 'disposableMailAddressOwner' DESC 'Owner DN' SUP distinguishedName SINGLE-VALUE )
+olcObjectClasses: {0} ( 666.666.4.2.1 NAME 'disposableMailBox' DESC 'Disposable mail box' SUP top STRUCTURAL MUST ( disposableMailAddress $ disposableMailAddressDiscard $ disposableMailAddressEnabled $ disposableMailAddressOwner $ description ) MAY disposableMailWhitelistedSender )
