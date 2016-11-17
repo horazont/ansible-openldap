@@ -1,23 +1,11 @@
 ---
 - name: install openldap (debian)
-  apt: name={{ item }} state=latest
-  when: "ansible_pkg_mgr == 'apt'"
+  apt:
+    name: "{{ item }}"
+    state: latest
   with_items:
   - slapd
   - ldap-utils
-  - python3
-  tags:
-  - ldap
-  notify:
-  - restart ldap
-
-- name: install openldap (redhat)
-  dnf: name={{ item }} state=latest
-  when: "ansible_pkg_mgr == 'dnf'"
-  with_items:
-  - openldap-servers
-  - openldap-clients
-  - python3-pip
   - python3
   tags:
   - ldap
@@ -35,43 +23,47 @@
   - hijack3.ldif
   - hijack4.ldif
   - hijack5.ldif
+  - hijack6.ldif
   tags:
   - ldap
 
 - name: start ldap
-  service: name=slapd state=started enabled=yes
+  service:
+    name: slapd
+    state: started
+    enabled: yes
   tags:
   - ldap
 
 - name: upload CA certificate
   copy:
     content: "{{openldap_cacert}}"
-    dest: /etc/{{ "openldap" if ansible_distribution == "Fedora" else "ldap" }}/cacert.pem
+    dest: /etc/ldap/cacert.pem
     mode: u=r,go-rwx
-    owner: '{{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}'
-    group: '{{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}'
+    owner: openldap
+    group: openldap
   when: openldap_cert and openldap_privkey and openldap_cacert
   tags:
   - ldap
 
 - name: upload server certificate
   copy:
-    content: "{{openldap_cert}}"
-    dest: /etc/{{ "openldap" if ansible_distribution == "Fedora" else "ldap" }}/cert.pem
+    content: "{{ openldap_cert }}"
+    dest: /etc/ldap/cert.pem
     mode: u=r,go-rwx
-    owner: '{{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}'
-    group: '{{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}'
+    owner: openldap
+    group: openldap
   when: openldap_cert and openldap_privkey and openldap_cacert
   tags:
   - ldap
 
 - name: upload server key
   copy:
-    content: "{{openldap_privkey}}"
-    dest: /etc/{{ "openldap" if ansible_distribution == "Fedora" else "ldap" }}/privkey.pem
+    content: "{{ openldap_privkey }}"
+    dest: /etc/ldap/privkey.pem
     mode: u=r,go-rwx
-    owner: '{{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}'
-    group: '{{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}'
+    owner: openldap
+    group: openldap
   when: openldap_cert and openldap_privkey and openldap_cacert
   tags:
   - ldap
@@ -79,28 +71,29 @@
 
 - name: configure ldap server
   script: configure-ldap.py server
-      --schema-dir '{{ "/etc/openldap/schema/" if ansible_os_family == "RedHat" else "/etc/ldap/schema/" }}'
+      --schema-dir '/etc/ldap/schema'
       '{{ "--debug" if openldap_debug else "--no-debug" }}'
       '{{ "--tls" if openldap_cacert and openldap_privkey and openldap_cert else "--no-tls" }}'
   register: configure
-  changed_when: 'configure.rc == 10'
-  failed_when: 'configure.rc != 0 and configure.rc != 10'
+  changed_when: configure.rc == 10
+  failed_when: configure.rc != 0 and configure.rc != 10
   tags:
   - ldap
 
 - include: openldap-ferm.yml
-  when: "ferm | default(False)"
+  when: ferm | default(False)
   tags:
   - ferm
   - ldap
 
 - name: prepare database directories
+  file:
+    state: directory
+    path: "/var/lib/ldap/{{ item.fqdn }}"
+    owner: openldap
+    group: openldap
+    mode: u=rwx,go-rwx
   with_items: "{{ openldap_master_domains + openldap_slave_domains }}"
-  file: state=directory
-        path="/var/lib/ldap/{{ item.fqdn }}"
-        owner={{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}
-        group={{ "ldap" if ansible_distribution == "Fedora" else "openldap" }}
-        mode=u=rwx,go-rwx
   tags:
   - ldap
 
@@ -111,6 +104,7 @@
       'dc={{ item.fqdn | replace(".", ",dc=") }}'
       {{ item.fqdn }}
       {{ item.admin_dn_password }}
+      {{ item.synccounterd_dn_password }}
   register: configure
   changed_when: 'configure.rc == 10'
   failed_when: 'configure.rc != 0 and configure.rc != 10'
@@ -136,18 +130,23 @@
 - name: configure ldap client
   template:
     src: ldap.conf
-    dest: /etc/{{ "openldap" if ansible_distribution == "Fedora" else "ldap" }}/ldap.conf
+    dest: /etc/ldap/ldap.conf
   tags:
   - ldap
 
 - name: deploy scripts
   template:
-    src=ldapum.py
-    dest=/usr/local/bin/ldapum
-    owner=root
-    group=root
-    mode=ug=rwx,o-rwx
+    src: ldapum.py
+    dest: /usr/local/bin/ldapum
+    owner: root
+    group: root
+    mode: ug=rwx,o-rwx
   when: openldap_install_scripts
   tags:
   - ldap
   - test
+
+- include: sync-check.yml
+  tags:
+  - ldap
+  - ldap-sync-check

@@ -1,0 +1,23 @@
+[Unit]
+Description=LDAP Sync Test
+After=slapd.service
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ldap-synctestd.py /etc/sync-check/%I.ini -vv
+StandardOutput=journal
+StandardError=journal
+Restart=always
+
+# security setup
+User=ldap-sync-checker
+Group=ldap-sync-checker
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true

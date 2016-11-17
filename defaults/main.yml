@@ -7,3 +7,5 @@ openldap_install_scripts: False
 openldap_cert: False
 openldap_privkey: False
 openldap_cacert: False
+openldap_synctest_update_interval: 20
+openldap_synctest_firewall_saddr_whitelist: []

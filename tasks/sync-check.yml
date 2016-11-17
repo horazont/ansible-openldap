@@ -1,0 +1,98 @@
+---
+- name: "sync-check: install dependencies"
+  apt:
+    name: "{{ item }}"
+    state: latest
+  with_items:
+  - python3
+  - python3-ldap3
+
+- name: "sync-check: create service group"
+  group:
+    system: yes
+    name: ldap-sync-checker
+    state: present
+
+- name: "sync-check: create service user"
+  user:
+    system: yes
+    name: ldap-sync-checker
+    group: ldap-sync-checker
+    home: /etc/sync-check/
+    createhome: no
+    shell: /bin/false
+    comment: "User under which the LDAP sync set and test run"
+    state: present
+
+- name: "sync-check: deploy executables"
+  copy:
+    src: "{{ item }}"
+    dest: /usr/local/bin/
+    owner: root
+    group: root
+    mode: ugo=rx
+  with_items:
+  - ldap-synccounterd.py
+  - ldap-synctestd.py
+
+- name: "sync-check: deploy service files"
+  copy:
+    src: "systemd/{{ item }}"
+    dest: /etc/systemd/system/
+  with_items:
+  - ldap-sync-test@.service
+  - ldap-sync-set@.service
+  register: service
+
+- name: "sync-check: reload systemd"
+  command: systemctl daemon-reload
+  when: service | changed
+
+- name: "sync-check: create config directory"
+  file:
+    state: directory
+    path: /etc/sync-check/
+    owner: ldap-sync-checker
+    group: ldap-sync-checker
+    mode: u=rx,go-rwx
+
+- name: "sync-check: deploy slave configuration"
+  template:
+    src: sync-check/slave-config.ini
+    dest: "/etc/sync-check/{{ item.fqdn }}.ini"
+    owner: ldap-sync-checker
+    group: ldap-sync-checker
+    mode: u=r,go-rwx
+  with_items: "{{ openldap_slave_domains }}"
+
+- name: "sync-check: start slave services"
+  service:
+    name: "ldap-sync-test@{{ item.fqdn }}.service"
+    state: restarted
+    enabled: yes
+  with_items: "{{ openldap_slave_domains }}"
+
+- name: "sync-check: deploy master configuration"
+  template:
+    src: sync-check/master-config.ini
+    dest: "/etc/sync-check/{{ item.fqdn }}.ini"
+    owner: ldap-sync-checker
+    group: ldap-sync-checker
+    mode: u=r,go-rwx
+  with_items: "{{ openldap_master_domains }}"
+
+- name: "sync-check: start master services"
+  service:
+    name: "ldap-sync-set@{{ item.fqdn }}.service"
+    state: restarted
+    enabled: yes
+  with_items: "{{ openldap_master_domains }}"
+
+- name: "sync-check: deploy ferm config"
+  template:
+    src: ferm/sync-check.conf
+    dest: /etc/ferm/ferm.d/60-ldap-sync-check.conf
+  when: ferm | default(False)
+  notify: run ferm
+  tags:
+  - ferm

@@ -391,6 +391,9 @@ def configure_ldap_domain_common(args, ldap, database_dn):
             "to dn.subtree=ou=Group,{domain}\
  by dn=cn=AuthManager,ou=Management,{domain} write\
  by * read".format(domain=args.domain),
+            "to attrs=counterValue\
+ by dn=cn=synccounterd,ou=Management,{domain} manage\
+ by * none".format(domain=args.domain),
             "to *\
  by self write\
  by * read"""
@@ -509,6 +512,24 @@ def configure_ldap_domain(args, ldap):
     )
 
     ldap.ensure_object(
+        "ou=Counters,"+args.domain,
+        [
+            "organizationalUnit",
+        ],
+        ("ou", "Counters"),
+    )
+
+    ldap.ensure_object(
+        "cn=synctest,ou=Counters,"+args.domain,
+        [
+            "genericCounter",
+        ],
+        ("cn", "synctest"),
+        ("counterValue", "0"),
+        strict=False,
+    )
+
+    ldap.ensure_object(
         "ou=DisposableMailBoxes,"+args.domain,
         [
             "organizationalUnit",
@@ -526,6 +547,13 @@ def configure_ldap_domain(args, ldap):
         ("sn", "Remote Manager"),
         ("userpassword", args.admin_dn_password),
         ("authzTo", "dn:cn=AuthManager,ou=Management,"+args.domain),
+    )
+
+    ldap.ensure_object(
+        "cn=synccounterd,ou=Management,"+args.domain,
+        ["simpleSecurityObject", "organizationalRole"],
+        ("cn", "synccounterd"),
+        ("userpassword", args.synccounterd_dn_password)
     )
 
     if args.replicator_dn_password:
@@ -571,6 +599,7 @@ def configure_ldap_server(args, ldap):
     ldap.ensure_schema("hijack3", schema_dir=args.schema_dir)
     ldap.ensure_schema("hijack4", schema_dir=args.schema_dir)
     ldap.ensure_schema("hijack5", schema_dir=args.schema_dir)
+    ldap.ensure_schema("hijack6", schema_dir=args.schema_dir)
 
     if args.debug:
         ldap.ensure_attr_values(
@@ -774,6 +803,7 @@ if __name__ == "__main__":
     parser.add_argument("domain")
     parser.add_argument("fqdn")
     parser.add_argument("admin_dn_password")
+    parser.add_argument("synccounterd_dn_password")
 
     parser = subparsers.add_parser("slave-domain")
     parser.set_defaults(func=configure_ldap_slave_domain)
