@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import base64
+import crypt
 import getpass
 import hashlib
 import random
@@ -88,6 +89,18 @@ add: objectClass
 objectClass: inetLocalMailRecipient
 -\n"""
 
+RENAME_USER_WITHOUT_SHELL_TEMPLATE = """\
+dn: uid={uid},ou=Account,{base}
+changetype: modrdn
+newrdn: uid={newuid}
+deleteoldrdn: 0
+
+dn: uid={newuid},ou=Account,{base}
+changetype: modify
+replace: uid
+uid: {newuid}
+-\n"""
+
 
 def ask_pass():
     pwd1 = getpass.getpass().encode("utf-8")
@@ -114,15 +127,8 @@ def ask_pass_or_exit(asker=ask_pass):
         sys.exit(1)
 
 
-def ssha_password(password):
-    sha1 = hashlib.sha1()
-    salt = rng.getrandbits(SALT_BYTES*8).to_bytes(SALT_BYTES, "little")
-    sha1.update(password)
-    sha1.update(salt)
-
-    digest = sha1.digest()
-    passwd = b"{SSHA}" + base64.b64encode(digest + salt)
-    return passwd
+def crypt_password(password):
+    return "{crypt}"+crypt.crypt(password)
 
 
 def useradd(args):
@@ -136,8 +142,7 @@ def useradd(args):
         given_name=args.given_name,
         mail=args.mail,
         base=args.base,
-        password_base64=base64.b64encode(ssha_password(args.password)).decode(
-            "ascii"))
+        password_base64=base64.b64encode(crypt_password(args.password)))
 
     if args.dry_run:
         print(instance)
@@ -183,14 +188,20 @@ def groupadd(args):
 
 
 def passwd(args):
-    if args.password is None:
-        args.password = ask_pass_or_exit(ask_pass_new)
+    if args.crypted_password is not None:
+        password_crypted = "{crypt}"+args.crypted_password
+    else:
+        if args.password is None:
+            args.password = ask_pass_or_exit(ask_pass_new)
+        password_crypted = crypt_password(args.password)
 
     instance = PASSWD_TEMPLATE.format(
         uid=args.uid,
         base=args.base,
-        password_base64=base64.b64encode(ssha_password(args.password)).decode(
-            "ascii"))
+        password_base64=base64.b64encode(
+            password_crypted.encode("ascii")
+        ).decode("ascii")
+    )
 
     if args.dry_run:
         print(instance)
@@ -211,7 +222,10 @@ def passwd(args):
 
 
 def mailaddress_add(args):
-    instance = "dn: uid={},ou=Account,{}\nchangetype: modify\n".format(args.uid, args.base)
+    instance = "dn: uid={},ou=Account,{}\nchangetype: modify\n".format(
+        args.uid,
+        args.base
+    )
     instance += "".join(
         ADD_MAIL_ALIAS_TEMPLATE.format(addr=addr)
         for addr in args.addrs
@@ -492,12 +506,22 @@ if __name__ == "__main__":
 
     sparser = subparsers.add_parser("passwd")
     sparser.set_defaults(func=passwd)
-    sparser.add_argument(
+
+    group = sparser.add_mutually_exclusive_group()
+    group.add_argument(
         "--password",
         default=None,
         metavar="PASSWORD",
         help="New password. If omitted, prompt for password on stdin."
     )
+    group.add_argument(
+        "--crypted-password",
+        metavar="CRYPT",
+        default=None,
+        help="New password as crypt() hash",
+    )
+
+
     sparser.add_argument(
         "uid",
         metavar="USERNAME",

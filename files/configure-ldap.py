@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import base64
+import crypt
 import logging
 import os.path
 import subprocess
@@ -480,6 +481,20 @@ def configure_ldap_domain(args, ldap):
     )
 
     ldap.ensure_object(
+        "cn=monitoring-viewer,ou=Permission,"+args.domain, "groupOfNames",
+        ("cn", "monitoring-viewer"),
+        ("member", "cn=dummy"),
+        strict=False,
+    )
+
+    ldap.ensure_object(
+        "cn=monitoring-editor,ou=Permission,"+args.domain, "groupOfNames",
+        ("cn", "monitoring-editor"),
+        ("member", "cn=dummy"),
+        strict=False,
+    )
+
+    ldap.ensure_object(
         "ou=IDPool,"+args.domain,
         [
             "organizationalUnit",
@@ -578,7 +593,8 @@ def configure_ldap_domain(args, ldap):
     ensure_group(
         ldap, args.domain, "ldapuser", 1098,
         "Removing users from this group will give them more permissions "
-        "than intended.")
+        "than intended."
+    )
 
 
 def configure_ldap_server(args, ldap):

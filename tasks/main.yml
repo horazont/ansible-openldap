@@ -144,7 +144,6 @@
   when: openldap_install_scripts
   tags:
   - ldap
-  - test
 
 - include: sync-check.yml
   tags:
