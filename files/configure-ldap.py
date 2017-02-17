@@ -415,6 +415,7 @@ def configure_ldap_domain_common(args, ldap, database_dn):
             "disposableMailAddressOwner eq",
             "disposableMailAddressEnabled eq",
             "disposableMailAddressDiscard eq",
+            "disposableMailAddress eq",
         ]
     )
 
