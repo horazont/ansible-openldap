@@ -1,4 +1,0 @@
-dn: cn=hijack7,cn=schema,cn=config
-objectClass: olcSchemaConfig
-cn: hijack7
-olcObjectClasses: {0}( 666.666.7.2.1 NAME 'device' DESC 'Device Authentication Object' SUP top STRUCTURAL MUST ( cn $ userPassword ) )

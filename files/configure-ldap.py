@@ -617,7 +617,6 @@ def configure_ldap_server(args, ldap):
     ldap.ensure_schema("hijack4", schema_dir=args.schema_dir)
     ldap.ensure_schema("hijack5", schema_dir=args.schema_dir)
     ldap.ensure_schema("hijack6", schema_dir=args.schema_dir)
-    ldap.ensure_schema("hijack7", schema_dir=args.schema_dir)
 
     if args.debug:
         ldap.ensure_attr_values(
