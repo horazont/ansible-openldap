@@ -24,6 +24,7 @@
   - hijack4.ldif
   - hijack5.ldif
   - hijack6.ldif
+  - hijack7.ldif
   tags:
   - ldap
 
