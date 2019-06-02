@@ -96,3 +96,12 @@
   notify: run ferm
   tags:
   - ferm
+
+- name: "sync-check: deploy nft config"
+  template:
+    src: sync-check/nft.conf
+    dest: /etc/nft.d/60-ldap-sync-check.conf
+  when: nft | default(False)
+  notify: reload nft
+  tags:
+  - ferm

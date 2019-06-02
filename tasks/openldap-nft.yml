@@ -1,0 +1,8 @@
+---
+- name: deploy nft config
+  template:
+    src: nft.conf
+    dest: /etc/nft.d/30-ldap.conf
+    owner: root
+    group: root
+  notify: reload nft

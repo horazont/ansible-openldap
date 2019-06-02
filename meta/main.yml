@@ -2,3 +2,5 @@
 dependencies:
 - role: ferm
   when: "ferm | default(False)"
+- role: nft
+  when: "nft | default(False)"

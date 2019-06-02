@@ -86,6 +86,12 @@
   - ferm
   - ldap
 
+- include: openldap-nft.yml
+  when: nft | default(False)
+  tags:
+  - nft
+  - ldap
+
 - name: prepare database directories
   file:
     state: directory
