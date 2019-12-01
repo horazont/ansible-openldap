@@ -10,6 +10,8 @@ import sys
 
 import ldap3
 
+import prometheus_client
+
 from datetime import datetime
 
 logger = logging.getLogger("main")
@@ -59,6 +61,40 @@ class Main:
 
         return conn
 
+    def _write_response(self, writer):
+        registry = prometheus_client.CollectorRegistry()
+
+        status_gauge = prometheus_client.Gauge(
+            "ldapsync_up",
+            "Connectivity to LDAP server",
+            registry=registry,
+        )
+
+        try:
+            ctr = self.read_counter()
+        except Exception as exc:
+            status_gauge.set(0)
+        else:
+            status_gauge.set(1)
+
+            delay_gauge = prometheus_client.Gauge(
+                "ldapsync_delay_seconds",
+                "Delay of LDAP replication in seconds",
+                registry=registry,
+            )
+
+            now = datetime.utcnow().timestamp()
+            delay_gauge.set(now-ctr)
+
+        writer.write(b"HTTP/1.0 200 OK\r\n")
+        writer.write(
+            "Content-Type: {}\r\n".format(
+                prometheus_client.exposition.CONTENT_TYPE_LATEST
+            ).encode("utf-8")
+        )
+        writer.write(b"\r\n")
+        writer.write(prometheus_client.exposition.generate_latest(registry))
+
     @asyncio.coroutine
     def client_handler(self, client_reader, client_writer):
         logger.debug("inbound connection")
@@ -67,12 +103,7 @@ class Main:
         sock.shutdown(socket.SHUT_RD)
 
         try:
-            ctr = self.read_counter()
-            now = datetime.utcnow().timestamp()
-
-            client_writer.write(
-                "{}".format(round(now-ctr)).encode("ascii")
-            )
+            self._write_response(client_writer)
             yield from client_writer.drain()
         finally:
             if client_writer.can_write_eof():
@@ -91,13 +122,13 @@ class Main:
             if not conn.search(
                     self.ctr_dn,
                     "(objectClass=genericCounter)",
-                    ldap3.SEARCH_SCOPE_BASE_OBJECT,
+                    ldap3.BASE,
                     attributes=[
                         "counterValue",
                     ]):
                 raise RuntimeError("failed to read counter")
 
-            counter = int(conn.response[0]["attributes"]["counterValue"][0])
+            counter = int(conn.response[0]["attributes"]["counterValue"])
             logger.debug("read counter value: %d", counter)
             return counter
         finally:
